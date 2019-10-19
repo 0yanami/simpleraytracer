@@ -1,1 +1,1 @@
-"# simpleraytracer" 
+# simpleraytracer
