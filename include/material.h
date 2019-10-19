@@ -69,7 +69,7 @@ public:
     virtual bool scatter(const ray &r_in, const hit_record &rec, vec3 &attenuation, ray &scattered) const
     {
         vec3 reflected = reflect(r_in.direction().unit_vector(), rec.normal);
-        scattered = ray(rec.p, reflected + random_in_unit_sphere() * fuzz);
+        scattered = ray(rec.p, reflected + random_in_unit_sphere() * fuzz, r_in.time());
         attenuation = albedo;
         return (scattered.direction().dot(rec.normal) > 0);
     }
@@ -102,13 +102,13 @@ class dielectric : public material
             if (refract(r_in.direction(), outward_normal, ni_over_nt, refracted)) {
                 reflect_prob = schlick(cosine, ref_idx);
             } else {
-               scattered = ray(rec.p, reflected);
+               scattered = ray(rec.p, reflected, r_in.time());
                reflect_prob = 1.0;
             }
             if(dis(gen) < reflect_prob){
-                scattered = ray(rec.p, reflected);
+                scattered = ray(rec.p, reflected, r_in.time());
             } else {
-                scattered = ray(rec.p, refracted);
+                scattered = ray(rec.p, refracted, r_in.time());
             }
 
             return true;
