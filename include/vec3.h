@@ -1,3 +1,7 @@
+#ifndef VEC3H
+#define VEC3H
+
+
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -144,3 +148,4 @@ inline vec3 reflect(const vec3 &v, const vec3 &n)
     return v - n * v.dot(n) * 2;
 }
 
+#endif
