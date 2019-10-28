@@ -1,7 +1,10 @@
-bin/
 build.bat
 .vscode/
 clang/
 build/
-*.png
+bin/
+build/
+output_archives/
+output/
 *.bmp
+earthmap.jpg
