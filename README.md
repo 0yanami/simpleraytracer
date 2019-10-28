@@ -1,6 +1,6 @@
 # simpleraytracer
 A simple ray tracer made for educational purpose
-##Features implemented
+## Features implemented
 - Basic ray casting 
 - Sphere shape
 - Shading (dielectric, metal, lambertian)
@@ -14,5 +14,5 @@ A simple ray tracer made for educational purpose
 - Image texture mapping
 - Rectangles and lights
 
-##Features to implement
+## Features to implement
 - Volumes
