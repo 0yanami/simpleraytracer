@@ -1,5 +1,5 @@
 # simpleraytracer
-A simple ray tracer made for educational purpose
+A simple ray tracer made for educational purpose using 'Raytracing In One Weekend' books
 ## Features implemented
 - Basic ray casting 
 - Sphere shape
