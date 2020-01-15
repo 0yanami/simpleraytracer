@@ -26,31 +26,37 @@
 #include "perlin.h"
 #include "image_texture.h"
 #include "rect.h"
-
+#include "flip_normal.h"
 
 using namespace std;
 
-vec3 color(const ray &r, hitable *world, int depth){
+vec3 color(const ray &r, hitable *world, int depth)
+{
     hit_record rec;
     if (world->hit(r, 0.001, 999999.9, rec))
     {
         ray scattered;
         vec3 attenuation;
         vec3 emitted = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
-        if (depth < 50 && rec.mat_ptr->scatter(r, rec, attenuation, scattered)){
+        if (depth < 50 && rec.mat_ptr->scatter(r, rec, attenuation, scattered))
+        {
             return emitted + attenuation * color(scattered, world, depth + 1);
         }
-        else{
+        else
+        {
             return emitted;
         }
-    } else {
+    }
+    else
+    {
         vec3 unit_direction = r.direction().unit_vector();
         float t = 0.5 * (unit_direction.y() + 1.0);
-        return vec3(0,0,0);
+        return vec3(0.5, 0.5, 0.5);
     }
 }
 
-void render_frame(int frame_num, vec3 cam_pos, vec3 res, hitable *world){
+void render_frame(camera cam, vec3 res, hitable *world)
+{
     //Anti Aliasing rng generator
     random_device rd;
     mt19937 gen(rd());
@@ -63,14 +69,8 @@ void render_frame(int frame_num, vec3 cam_pos, vec3 res, hitable *world){
     auto image_buffer = (unsigned char *)malloc(nx * ny * 3 * sizeof(unsigned char));
 
     //init camera
-    //vec3 lookfrom = vec3(3, 0.5, 2);
-    //vec3 lookat = vec3(0, 0, -1);
-    vec3 lookfrom = vec3(13, 2, 3);
-    vec3 lookat = vec3(0, 2, 0);
 
-    float dist_to_focus = (lookfrom - lookat).length();
-    float aperture = 0.0;
-    camera cam(lookfrom, lookat, vec3(0, 1, 0), 25, float(nx) / float(ny), aperture, dist_to_focus, 0.0, 1.0);
+
 
 #pragma omp parallel for
     for (int i = 0; i < ny * nx; i++){
@@ -90,19 +90,28 @@ void render_frame(int frame_num, vec3 cam_pos, vec3 res, hitable *world){
     }
     //file path
     ostringstream fileNameStream("out");
-    fileNameStream << "output/out" << frame_num << ".bmp";
+    fileNameStream << "output/out.png";
     string fileName = fileNameStream.str();
 
     //writing image
-    stbi_write_bmp(fileName.c_str(), nx, ny, 3, image_buffer);
+    stbi_write_png(fileName.c_str(), nx, ny, 3, image_buffer, nx*3);
+    //stbi_write_bmp(fileName.c_str(), nx, ny, 3, image_buffer);
     free(image_buffer);
 }
 
-hitable *scene1()
+//material outdoor tests
+hitable *scene1(camera* cam, int nx, int ny)
 {
-    
-    texture *checker = new checker_texture( new constant_texture(vec3(0.1, 0.1, 0.1)),
-                                            new constant_texture(vec3(0.9, 0.9, 0.9)));
+    //camera settings
+    vec3 lookfrom = vec3(4, 0.5, 3);
+    vec3 lookat = vec3(0.5, 0, -1);
+    //camera settings
+    float dist_to_focus = (lookfrom - lookat).length();
+    float aperture = 0.1;
+    cam->setup(lookfrom, lookat, vec3(0, 1, 0), 25, float(nx) / float(ny), aperture, dist_to_focus, 0.0, 1.0);
+
+    texture *checker = new checker_texture(new constant_texture(vec3(0.1, 0.1, 0.1)),
+                                           new constant_texture(vec3(0.9, 0.9, 0.9)));
     lambertian *mat1 = new lambertian(checker);
     metal *mat2 = new metal(vec3(0.9, 0.1, 0.1), 0.01);
     metal *mat4 = new metal(vec3(0.8, 0.6, 0.3), 0.1);
@@ -120,52 +129,81 @@ hitable *scene1()
     return world;
 }
 
-hitable *scene2()
+//texture, rectangles and lights
+hitable *scene2(camera* cam, int nx, int ny)
 {
-    int nx, ny, nn;
-    unsigned char *tex_data = stbi_load("earthmap.jpg", &nx, &ny, &nn, 0);
-    material *map =  new lambertian(new image_texture(tex_data, nx, ny));
+    //camera settings
+    vec3 lookfrom = vec3(12, 2.5, 0);
+    vec3 lookat = vec3(0, 1.5, 0);
+    //camera settings
+    float dist_to_focus = (lookfrom - lookat).length();
+    float aperture = 0.0;
+    cam->setup(lookfrom, lookat, vec3(0, 1, 0), 40, float(nx) / float(ny), aperture, dist_to_focus, 0.0, 1.0);
+
+    //texture loading
+    int texx, texy, texn;
+    unsigned char *tex_data = stbi_load("earthmap.jpg", &texx, &texy, &texn, 0);
+    material *map = new lambertian(new image_texture(tex_data, texx, texy));
 
     hitable **list;
-    list = (hitable **)malloc(sizeof(hitable *) * 5);
-    list[0] = new sphere(vec3(0, -1000, 0), 1000, new lambertian(new constant_texture(vec3(0.5,0.5,0.5)))); //ground
+    list = (hitable **)malloc(sizeof(hitable *) * 7);
+    list[0] = new sphere(vec3(0, -1000, 0), 1000, new lambertian(new constant_texture(vec3(0.5, 0.5, 0.5)))); //ground
     list[1] = new sphere(vec3(0, 2, 0), 2, map);
-    list[2] = new sphere(vec3(0, 9, 0), 2, new diffuse_light(new constant_texture(vec3(0.9,1.8,7))));
-    list[3] = new xy_rect(0, 3, 0.5, 4, -4, new diffuse_light(new constant_texture(vec3(4,4,4))));
-    list[4] = new xy_rect(0, 2, 1, 2.5, 4, new diffuse_light(new constant_texture(vec3(4,1,0))));
-    hitable *world = new hitable_list(list, 5);
+    list[2] = new sphere(vec3(1, 1, -3.1), 1, new dielectric(1.5));
+    list[3] = new sphere(vec3(1, 1, 3), 0.5, new metal(vec3(0.8, 0.6, 0.3), 0.01));
+    list[4] = new sphere(vec3(0, 9, 0), 2, new diffuse_light(new constant_texture(vec3(1, 2, 10))));
+    list[5] = new xy_rect(0, 3, 0.5, 4, -4, new diffuse_light(new constant_texture(vec3(1, 1, 1))));
+    list[6] = new xy_rect(0, 2, 1, 2.5, 4, new diffuse_light(new constant_texture(vec3(1, 0.2, 0))));
+    hitable *world = new hitable_list(list, 7);
     return world;
 }
 
-int main(int argc, const char *argv[]){
+//indoor and lights
+hitable *scene3(camera* cam, int nx, int ny)
+{
+    //camera settings
+    vec3 lookfrom = vec3(278, 278, -800);
+    vec3 lookat = vec3(278, 278, 0);
+    //camera settings
+    float dist_to_focus = (lookfrom - lookat).length();
+    float aperture = 0.0;
+    cam->setup(lookfrom, lookat, vec3(0, 1, 0), 40, float(nx) / float(ny), aperture, dist_to_focus, 0.0, 1.0);
+
+    int texx, texy, texn;
+    unsigned char *tex_data = stbi_load("earthmap.jpg", &texx, &texy, &texn, 0);
+    material *map = new lambertian(new image_texture(tex_data, texx, texy));
+
+    hitable **list;
+    list = (hitable **)malloc(sizeof(hitable *) * 6);
+    list[0] = new flip_normals(new yz_rect(0, 555, 0, 555, 555, new lambertian(new constant_texture(vec3(0, 1, 0)))));
+    list[1] = new yz_rect(0, 555, 0, 555, 0, new lambertian(new constant_texture(vec3(1, 0.05, 0.05))));
+    list[2] = new flip_normals(new xz_rect(20, 20 + 200, 534 - 200, 534, 554, new diffuse_light(new constant_texture(vec3(2, 2, 2)))));
+    list[3] = new flip_normals(new xy_rect(0, 555, 0, 555, 555, new lambertian(new constant_texture(vec3(1, 1, 1)))));
+    list[4] = new xz_rect(0, 555, 0, 555, 0, new lambertian(new constant_texture(vec3(1, 1, 1))));
+    list[5] = new flip_normals(new xz_rect(0, 555, 0, 555, 555, new lambertian(new constant_texture(vec3(1, 1, 1)))));
+    hitable *world = new hitable_list(list, 6);
+    return world;
+}
+
+int main(int argc, const char *argv[])
+{
     auto start = std::chrono::high_resolution_clock::now();
 
     // image definition
-    const int nx = 1500; //resolution horizontale
-    const int ny = 750; //resolution verticale
-    const int ns = 100; // samples
-    const int frames = 1;
-    vec3 pos_cam = vec3(0, 0.5, 4);
-    vec3 cam_dir = vec3(0, 0, 0); //direction de l'anim
+    const int nx = 1200; //resolution horizontale
+    const int ny = 600; //resolution verticale
+    const int ns = 300; // samples
+    camera cam;
+    
     cout << "\n---- beggining render at resolution " << nx << "*" << ny << "px with " << ns << " samples ----\n";
+    
+    //load scene
+    hitable *world = scene2(&cam, nx, ny);
+    //rendering
+    render_frame(cam, vec3(nx, ny, ns), world);
 
-    //list des objets
-    //std::shared_ptr<hitable> list[5]; // std::make_shared<sphere>(...)
-    vec3 frame_pos_cam = pos_cam;
-    hitable *world = scene2();
-
-    int count = 0;
-    for (int i = 0; i < frames; i++){
-        auto start2 = chrono::high_resolution_clock::now();
-        frame_pos_cam = (pos_cam + cam_dir * float(float(i) / float(frames)));
-        render_frame(i, frame_pos_cam, vec3(nx, ny, ns), world);
-        auto end2 = chrono::high_resolution_clock::now();
-        chrono::duration<double> diff2 = end2 - start2;
-        cout << "render of frame " << count + 1 << "/" << frames << " took " << diff2.count() << "s\n";
-        count++;
-    }
     auto end = chrono::high_resolution_clock::now();
     chrono::duration<double> diff = end - start;
-    cout << "--- Total time to render sequence: " << diff.count() << " s ---\n";
+    cout << "--- Time to render: " << diff.count() << " s ---\n";
     return 0;
 }
